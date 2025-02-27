@@ -1,0 +1,22 @@
+[
+  {
+    "name": "kb_deployment_1",
+    "module": { "name": "validation_kb" },
+    "node": { "ip": "localhost" },
+    "config": {
+      "storage_config": {
+        "storage_type": "db",
+        "path": "validation_kb",
+        "options": {
+          "query_col": "problem",
+          "answer_col": "validation"
+        },
+        "storage_schema": {
+          "id": { "type": "INTEGER", "primary_key": true },
+          "problem": { "type": "TEXT" },
+          "validation": { "type": "TEXT" }
+        }
+      }
+    }
+  }
+]
