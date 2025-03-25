@@ -10,8 +10,8 @@ from naptha_sdk.inference import InferenceClient
 from naptha_sdk.schemas import AgentDeployment, AgentRunInput
 from naptha_sdk.user import sign_consumer_id, get_private_key_from_pem
 
-from schemas import ValidationInput, SystemPromptSchema, ValidationResult
-from prompt import verifier_prompt, score_prompt, vote_prompt, compare_prompt
+from validation_modules.schemas import InputSchema, SystemPromptSchema, ValidationResult
+from validation_modules.prompt import verifier_prompt, score_prompt, vote_prompt, compare_prompt
 
 logger = logging.getLogger(__name__)
 
@@ -225,7 +225,7 @@ class ValidationAgent:
 
 async def run(module_run: Dict, *args, **kwargs):
     module_run = AgentRunInput(**module_run)
-    module_run.inputs = ValidationInput(**module_run.inputs)
+    module_run.inputs = InputSchema(**module_run.inputs)
     validation_agent = ValidationAgent()
     await validation_agent.create(module_run.deployment)
     result = await validation_agent.run(module_run)

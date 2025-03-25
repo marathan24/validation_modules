@@ -1,7 +1,7 @@
 from pydantic import BaseModel
 from typing import List, Optional
 
-class ValidationInput(BaseModel):
+class InputSchema(BaseModel):
     func_name: str
     problem: str
     thoughts: List[str]
