@@ -15,11 +15,6 @@
       "system_prompt": {
         "role": "You are a logical reasoning validator that carefully evaluates the quality of reasoning."
       }
-    },
-    "kb_deployments": [
-      {
-        "name": "kb_deployment_1"
-      }
-    ]
+    }
   }
 ]
