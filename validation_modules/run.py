@@ -22,8 +22,22 @@ class ValidationAgent:
         self.inference_client = InferenceClient(self.deployment.node)
     
     async def run(self, module_run: AgentRunInput, *args, **kwargs):
-        problem = module_run.inputs.problem
-        thoughts = module_run.inputs.thoughts
+        # Try to decode JSON-encoded inputs, with fallback to raw strings
+        try:
+            problem = json.loads(module_run.inputs.problem)
+        except (json.JSONDecodeError, TypeError):
+            problem = module_run.inputs.problem  # Fallback to raw string
+            
+        encoded_thoughts = module_run.inputs.thoughts
+        
+        # Try to decode each thought, with fallback
+        thoughts = []
+        for thought in encoded_thoughts:
+            try:
+                decoded_thought = json.loads(thought)
+            except (json.JSONDecodeError, TypeError):
+                decoded_thought = thought  # Fallback to raw string
+            thoughts.append(decoded_thought)
         
         logger.info(f"Starting validation for {len(thoughts)} thoughts")
         
