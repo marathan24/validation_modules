@@ -22,30 +22,17 @@ class ValidationAgent:
         self.inference_client = InferenceClient(self.deployment.node)
     
     async def run(self, module_run: AgentRunInput, *args, **kwargs):
-        # Handle problem with better error recovery
+        # Use inputs directly without trying to parse as JSON
         problem = module_run.inputs.problem
-        if isinstance(problem, str):
-            # Clean up the problem string in case it has issues
-            problem = problem.rstrip(',').strip()
-        
-        # Process thoughts - directly use them without trying to decode
         thoughts = module_run.inputs.thoughts
-        processed_thoughts = []
         
-        # Clean up and process thoughts
-        for thought in thoughts:
-            if isinstance(thought, str):
-                # Clean up any problematic characters
-                thought = thought.replace('\\"', '"').strip()
-            processed_thoughts.append(thought)
-        
-        logger.info(f"Starting validation for {len(processed_thoughts)} thoughts")
+        logger.info(f"Starting validation for {len(thoughts)} thoughts")
         
         # Step 1: Verify each thought
         valid_thoughts = []
         verification_details = []
         
-        for i, thought in enumerate(processed_thoughts):
+        for i, thought in enumerate(thoughts):
             is_valid, verification = await self._verify_reasoning(thought, problem)
             verification_details.append(verification)
             
@@ -56,7 +43,7 @@ class ValidationAgent:
                 logger.info(f"Thought {i+1} is invalid: {verification}")
         
         # Step 2: Score each valid thought (or all thoughts if none are valid)
-        thoughts_to_score = valid_thoughts if valid_thoughts else processed_thoughts
+        thoughts_to_score = valid_thoughts if valid_thoughts else thoughts
         scores = []
         
         for thought in thoughts_to_score:
@@ -102,10 +89,10 @@ class ValidationAgent:
             
         # Map the index back to the original thoughts list as needed accordingly
         if valid_thoughts:
-            original_index = processed_thoughts.index(thoughts_to_score[best_thought_index])
-            best_thought = processed_thoughts[original_index]
+            original_index = thoughts.index(thoughts_to_score[best_thought_index])
+            best_thought = thoughts[original_index]
         else:
-            best_thought = processed_thoughts[best_thought_index]
+            best_thought = thoughts[best_thought_index]
             
         logger.info(f"Selected best thought (index {best_thought_index})")
         
@@ -239,44 +226,28 @@ class ValidationAgent:
 
 async def run(module_run: Dict, *args, **kwargs):
     try:
-        # Convert module_run to AgentRunInput
-        module_run = AgentRunInput(**module_run)
-        
-        # Validate without using json.loads
+        # Handle validation errors better for original error troubleshooting
         try:
-            # Make a copy of inputs for validation to avoid modifying original
-            validation_inputs = {}
-            for key, value in module_run.inputs.__dict__.items():
-                if key == "problem" and isinstance(value, str):
-                    validation_inputs[key] = value.rstrip(',').strip()
-                elif key == "thoughts" and isinstance(value, list):
-                    validation_inputs[key] = [
-                        t.replace('\\"', '"').strip() if isinstance(t, str) else t 
-                        for t in value
-                    ]
-                else:
-                    validation_inputs[key] = value
-                
-            # Create InputSchema instance with cleaned data
-            module_run.inputs = InputSchema(**validation_inputs)
+            # Convert to AgentRunInput first
+            module_run_obj = AgentRunInput(**module_run)
+            # Then validate inputs
+            module_run_obj.inputs = InputSchema(**module_run_obj.inputs)
         except Exception as e:
-            logger.error(f"Failed to validate input schema: {e}")
-            # Create a more detailed error message
-            error_details = f"Input validation error: {str(e)}\nInputs: {module_run.inputs}"
-            raise ValueError(error_details)
-        
-        # Create and run the validation agent
+            logger.error(f"Failed to validate inputs: {e}")
+            raise ValueError(f"Failed to validate inputs: {e}")
+
+        # Create and run validation agent
         validation_agent = ValidationAgent()
-        await validation_agent.create(module_run.deployment)
-        result = await validation_agent.run(module_run)
+        await validation_agent.create(module_run_obj.deployment)
+        result = await validation_agent.run(module_run_obj)
         return result
     except Exception as e:
-        logger.error(f"Error in run function: {e}")
+        import traceback
+        logger.error(f"Error in validation agent: {e}")
         logger.error(f"Traceback: {traceback.format_exc()}")
         raise
 
 if __name__ == "__main__":
-    import asyncio
     import traceback
     from naptha_sdk.client.naptha import Naptha
     from naptha_sdk.configs import setup_module_deployment
@@ -315,7 +286,10 @@ if __name__ == "__main__":
         "signature": sign_consumer_id(naptha.user.id, get_private_key_from_pem(os.getenv("PRIVATE_KEY")))
     }
 
-    response = asyncio.run(run(module_run))
-
-    logger.info("Final Validation Output:")
-    logger.info(response)
+    try:
+        response = asyncio.run(run(module_run))
+        print("Final Validation Output:")
+        print(response)
+    except Exception as e:
+        print(f"Error: {e}")
+        print(traceback.format_exc())
