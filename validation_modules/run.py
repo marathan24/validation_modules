@@ -22,22 +22,11 @@ class ValidationAgent:
         self.inference_client = InferenceClient(self.deployment.node)
     
     async def run(self, module_run: AgentRunInput, *args, **kwargs):
-        # Try to decode JSON-encoded inputs, with fallback to raw strings
-        try:
-            problem = json.loads(module_run.inputs.problem)
-        except (json.JSONDecodeError, TypeError):
-            problem = module_run.inputs.problem  # Fallback to raw string
-            
-        encoded_thoughts = module_run.inputs.thoughts
+        # Process problem - handle it as a simple string to avoid JSON parsing issues
+        problem = module_run.inputs.problem
         
-        # Try to decode each thought, with fallback
-        thoughts = []
-        for thought in encoded_thoughts:
-            try:
-                decoded_thought = json.loads(thought)
-            except (json.JSONDecodeError, TypeError):
-                decoded_thought = thought  # Fallback to raw string
-            thoughts.append(decoded_thought)
+        # Process thoughts directly, without JSON loading
+        thoughts = module_run.inputs.thoughts
         
         logger.info(f"Starting validation for {len(thoughts)} thoughts")
         
@@ -238,8 +227,16 @@ class ValidationAgent:
         return ""  # Return empty string if no answer found
 
 async def run(module_run: Dict, *args, **kwargs):
+    # Skip json.loads to avoid syntax errors with complex strings
     module_run = AgentRunInput(**module_run)
-    module_run.inputs = InputSchema(**module_run.inputs)
+    try:
+        module_run.inputs = InputSchema(**module_run.inputs)
+    except Exception as e:
+        logger.error(f"Failed to validate input schema: {e}")
+        # Create a more detailed error message
+        error_details = f"Input validation error: {str(e)}\nInputs: {module_run.inputs}"
+        raise ValueError(error_details)
+    
     validation_agent = ValidationAgent()
     await validation_agent.create(module_run.deployment)
     result = await validation_agent.run(module_run)
@@ -262,16 +259,15 @@ if __name__ == "__main__":
             user_id=naptha.user.id
         )
     )
-
+    thought1 = "Strategy:\nI'll calculate the sum of the first 100 Priosha's {frac(n(n+1))} positive integers.\n\nAnswer:\nI can use the arithmetic sequence formula: S = n/2 * (a₁ + aₙ), where n is the number of terms, a₁ is the first term, and aₙ is the last term.\nS = 100/2 * (1 + 100)\nS = 50 * 101\nS = 5050\nThe answer is 5050"
     # Example thoughts for testing
-    thoughts = [
-        "Strategy:\nTo solve this problem, I need to find the sum of the first 100 positive integers.\n\nAnswer:\nI'll use the formula sum = n(n+1)/2 where n is the number of terms.\nsum = 100(100+1)/2\nsum = 100(101)/2\nsum = 10100/2\nsum = 5050\nThe answer is 5050.",
-        
-        "Strategy:\nI'll calculate the sum of the first 100 positive integers.\n\nAnswer:\nI can use the arithmetic sequence formula: S = n/2 * (a₁ + aₙ), where n is the number of terms, a₁ is the first term, and aₙ is the last term.\nS = 100/2 * (1 + 100)\nS = 50 * 101\nS = 5050\nThe answer is 5050.",
-        
-        "Strategy:\nTo find the sum of integers from 1 to 100, I'll add them up in pairs.\n\nAnswer:\nI can pair the numbers from opposite ends: 1+100, 2+99, 3+98, etc.\nEach pair sums to 101, and there are 50 such pairs.\nTotal sum = 50 * 101 = 5050\nThe answer is 5050."
+    thoughts = [        
+        thought1,
+        "Strategy:\nFirst, determine how many plants Toni has by calculating 60% more than the number of plants Frederick has. Since Frederick has 10 plants, we find 60% of 10, which is 6. Then, we add this to Frederick's 10 plants to find Toni's total. After finding Toni's number of plants, we subtract 7 from Toni's total to find out how many plants Shondra has.\n\nAnswer:\nFrederick has 10 plants. Therefore, 60% of 10 is 6. Adding this to Frederick's 10 gives Toni 16 plants (10 + 6 = 16). Shondra has 7 fewer plants than Toni, which means Shondra has 9 plants (16 - 7 = 9). Therefore, the answer is 9."
     ]
 
+    for i in range(len(thoughts)):
+        print(f"Thought {i+1}: {thoughts[i]}")
     input_params = {
         "func_name": "validate",
         "problem": "What is the sum of all integers from 1 to 100?",
